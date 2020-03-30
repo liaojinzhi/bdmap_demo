@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+	<style type="text/css">
+		body, html,#allmap {width: 100%;height: 100%;overflow: hidden;margin:0;font-family:"微软雅黑";}
+		#allmap{
+			width: 60%;
+			height: 60%;
+			margin: 10em auto;
+		}
+	</style>
+	<script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=c7WF4ji8XvvAadFEyX7zTVRWijpoOwUp"></script>
+	<script  type="text/javascript" src="mapStyleCity.js"></script>
+	<script  type="text/javascript" src="mapStyle.js"></script>
+	<script  type="text/javascript" src="DongGuanGrid.js"></script>
+	<script  type="text/javascript" src="DongGuanCenter.js"></script>
+	<title>添加行政区划</title>
+</head>
+<body>
+	<div id="allmap"></div>
+</body>
+</html>
+<script type="text/javascript">
+	/*
+		1, 设置地图风格 
+			mapStyleCity.js（『全市模式』 - 地图风格 ） 
+			mapStyle（『镇街模式』 - 地图风格 ）
+			
+		2，加载地图数据，渲染图层 
+			DongGuanGrid 东莞市所有镇区的geo地理数据
+			DongGuanCenter 东莞各镇街中心点坐标
+			主要方法
+			// 添加图层
+			map.addOverlay(Polygon)   
+			// 返回地图上的所有覆盖物 图层可加标记
+			map.getOverlays()         item.hide() //隐藏 item.show() // 显示  
+			// 清除覆盖物
+			map.clearOverlays();    
+			// 防止板块被清除
+			map.disableMassClear()       
+			// 防止板块被清除
+			enableMassClear: false 
+			// 画覆盖物(多边形)
+			new BMap.Polygon   setFillColorr('#7e0000')  重绘板块颜色
+			// 画覆盖物(字体)
+			new BMap.Label(text, opts);  setStyle({ width })
+			// 画覆盖物(图标)
+			new BMap.Icon() setImageSize
+			// 画点
+			new BMap.Marker(point, { icon: icon, offset })       
+			// 禁止地图缩放
+			map.disableScrollWheelZoom()   
+			// 禁用双击放大
+			map.disableDoubleClickZoom()  
+			// 禁用地图拖拽
+			map.disableDragging()         
+			// 监听滚轮
+			map.addEventListener("zoomend", ()=>{}) 
+			// 设置中心点 以及 层级
+			map.centerAndZoom(new BMap.Point(113.925652, 22.916404), 11); 
+			// 设置主题风格
+			map.setMapStyle({ styleJson: mapStyleCity });
+			// 从地图中移除覆盖物  从所有的图层别返回
+			map.removeOverlay( Overlay )
+			// 以指定的经度和纬度创建一个地理点坐标
+			new BMap.Point 
+			// 此类以像素表示一个矩形区域的大小
+			new BMap.Size
+	*/
+	let map = null; 
+	// 文本样式
+	const textStyle = {width: '40px', textAlign: "center", color: "#ffffff", fontSize: "12px", height: "0px", lineHeight: "20px", fontFamily: "微软雅黑", border: "none", background: "transparent"}
+
+	// 隐藏33个镇街板块
+	let hidePolygon = () => {
+		// 隐藏所有的区域
+		let getPolygons = map.getOverlays().filter(_ => _.city);
+		getPolygons.forEach(_ => _.hide());
+		// 隐藏名称
+		let getLabel = map.getOverlays().filter(_ => _.label);
+		getLabel.forEach(_ => _.hide());
+		// 隐藏全市风险点
+		// this.getCityPoint().forEach(_ => _.hide());
+	}
+	
+	 // 显示33个镇街板块
+	let showPolygon = () => {
+		// 隐藏所有的区域
+		let getPolygons = map.getOverlays().filter(_ => _.city);
+		getPolygons.forEach(_ => _.show());
+		// 隐藏名称
+		let getLabel = map.getOverlays().filter(_ => _.label);
+		getLabel.forEach(_ => _.show());
+	}
+		
+	// 进入街镇地图
+	let enterStreet = (city, map)=>{
+		// 清除覆盖物
+		map.clearOverlays();
+		// 获取镇街坐标
+		const [x, y] = DongGuanCenter[city];
+		const point = new BMap.Point(x, y);
+		map.centerAndZoom(point, 12);
+		map.enableScrollWheelZoom();
+		map.enableDragging();
+		// 当前镇街
+		lightCity(city);
+		setLabel({ width:null, fontsize: '30px', point, text: city, color: '#ffffff', offset: new BMap.Size(0, 0), isClear: true })
+	}
+
+	// 高亮的镇街
+	let lightCity = (city) => {
+		// 南城
+		let path = "";
+		let path2;
+
+		// 获取当前选中的镇街的轮廓坐标集合
+		const grid = DongGuanGrid[city]
+		// 拼接path成 "180, 90;" 格式
+		path = grid.join(';') + ';'
+		// 东南西北四个角
+		const EN_JW = "180, 90;";
+		const NW_JW = "-180,  90;";
+		const WS_JW = "-180, -90;";
+		const SE_JW = "180, -90;";
+
+		// 东南西北四个角添加一个覆盖物
+		const ply = new BMap.Polygon(
+			path + SE_JW + WS_JW + NW_JW + EN_JW + SE_JW, {
+				strokeColor: "none",
+				fillColor: "#020729",
+				fillOpacity: 0.8,
+			}
+		);
+		// 遮罩
+		map.addOverlay(ply);
+
+		// 当前镇街边界
+		path2 = grid.map(g => new BMap.Point(...g));
+		// 画线
+		const ply2 = new BMap.Polyline(path2, {
+			strokeColor: "aqua",
+			strokeOpacity: 1,
+			strokeWeight: 2
+		});
+		// 边界线 数据问题，所以要另加一根线
+		map.addOverlay(ply2);
+	}
+	
+	// 离开镇街
+	let outStreet = ()=> {
+		// 清除覆盖物
+		map.clearOverlays();
+		// 全市定位和层级设定
+		map.centerAndZoom(new BMap.Point(113.925652, 22.916404), 11);
+		// 禁止地图缩放
+		map.disableScrollWheelZoom();
+		// 禁用地图拖拽
+		map.disableDragging();
+		// 显示图层
+		showPolygon()
+	}
+		
+	// 添加文字
+	let setLabel = (obj)=>{
+		const { width, point, fontsize, text, color, offset, isClear } = obj
+
+		const opts = {
+			// 指定文本标注所在的地理位置
+			position: point,
+			// 设置文本偏移量
+			offset
+		};
+		// 创建文本标注对象
+		const label = new BMap.Label(text, opts);
+		// 添加识别属性
+		label['label'] = text
+
+		// 文本标注样式
+		label.setStyle(textStyle);
+		width && label.setStyle({ width });
+		color && label.setStyle({ color });
+		fontsize && label.setStyle({ fontSize:fontsize });
+
+		// 禁止覆盖物在map.clearOverlays方法中被清除
+		!isClear && label.disableMassClear();
+		map.addOverlay(label);
+	}
+
+	// 渲染东莞市轮廓
+	let renderPolygons = ()=>{
+		// 创建板块的方法
+		const creadPolygon = (path,key)=>{
+			// 镇街轮廓
+			let polygon = new BMap.Polygon(path, {
+					strokeColor: '#57beef',
+					strokeWeight: 1,
+					strokeOpacity: 1,
+					fillColor: 'rgba(17, 50, 134, .8)',
+					fillOpacity: 1,
+					enableMassClear: false
+				});
+				// 禁止覆盖物在map.clearOverlays方法中被清除
+				polygon.disableMassClear();
+				// 添加 『镇街名』 标记
+				polygon["city"] = key;
+
+				// 为 polygon 添加鼠标事件绑定
+				polygon.addEventListener("dblclick", e => {
+					// 进入镇街地图
+					// e.target.city && this.enterStreet(e.target.city, map);
+					// debugger
+					// map.clearOverlays();
+					// let getPolygons = map.getOverlays().filter(_ => _.city);
+					// map.removeOverlay(getPolygons[0]);
+					// return
+					hidePolygon();
+					// 进入镇街地图
+					e.target.city && enterStreet(e.target.city, map);
+				});
+				// 插入地图
+				map.addOverlay(polygon);
+		}
+
+		// 遍历数据
+		Object.getOwnPropertyNames(DongGuanGrid).forEach(key => {
+			// 转化为路径
+			const grid = DongGuanGrid[key]
+			
+			const path = grid.map(g => new BMap.Point(...g));
+
+			// 创建板块
+			creadPolygon(path,key)
+			
+			// 各镇街板块的【中心点】坐标
+			const [x, y] = DongGuanCenter[key];
+			const point = new BMap.Point(x, y)
+			// 把握宽度使文字居中
+			let width = ''
+			width = key.length === 2 ? '20px' : '30px'
+
+			// 添加不可删除文字
+			setLabel({ width, point, text: key, color: '#ffffff', offset: new BMap.Size(0, 0), isClear: false })
+		})
+	}
+
+    let mounted = ()=>{
+		// 创建Map实例,设置地图允许的最小/大级别, 关闭底图可点功能
+		map = new BMap.Map("allmap", {minZoom: 11, maxZoom: 19, enableMapClick: false })
+		// 全市定位和层级设定
+		map.centerAndZoom(new BMap.Point(113.925652, 22.916404), 11);
+		// 设置主题风格
+		map.setMapStyle({ styleJson: mapStyleCity });
+		 // 禁止地图缩放
+		// map.disableScrollWheelZoom()
+        // 禁用双击放大
+        // map.disableDoubleClickZoom()
+        // 禁用地图拖拽
+		// map.disableDragging()
+		 // 设置层级权限
+		map.getPanes().markerPane.style.zIndex = '600';
+		// 东莞市轮廓
+		renderPolygons(map)
+		
+        // 退出镇街地图(首次会触发 const isFirst = ((n = 1) => () => --n === 0)();)
+		map.addEventListener("zoomend", e => map.getZoom() === 11 && outStreet(map))
+	}
+
+	// 入口
+	mounted();
+</script>
